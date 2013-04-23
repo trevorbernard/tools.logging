@@ -32,172 +32,181 @@
   (get-logger [factory logger-ns]
     "Returns an implementation-specific Logger by namespace."))
 
+(defmacro ^:private compile-if
+  "Evaluate `exp` and if it returns logical true and doesn't error, expand to
+  `then`.  Else expand to `else`.
+
+  (compile-if (Class/forName \"java.util.concurrent.ForkJoinTask\")
+    (do-cool-stuff-with-fork-join)
+    (fall-back-to-executor-services))"
+  [exp then else]
+  (if (try (eval exp)
+           (catch Throwable _ false))
+    `(do ~then)
+    `(do ~else)))
+
 (defn slf4j-factory
   "Returns a SLF4J-based implementation of the LoggerFactory protocol, or nil if
   not available."
   []
-  (try
-    (Class/forName "org.slf4j.Logger")
-    (eval
-      `(do
-        (extend org.slf4j.Logger
-          Logger
-          {:enabled?
-           (fn [^org.slf4j.Logger logger# level#]
-             (condp = level#
-               :trace (.isTraceEnabled logger#)
-               :debug (.isDebugEnabled logger#)
-               :info  (.isInfoEnabled  logger#)
-               :warn  (.isWarnEnabled  logger#)
-               :error (.isErrorEnabled logger#)
-               :fatal (.isErrorEnabled logger#)
-               (throw (IllegalArgumentException. (str level#)))))
-           :write!
-           (fn [^org.slf4j.Logger logger# level# ^Throwable e# msg#]
-             (let [^String msg# (str msg#)]
-               (if e#
-                 (condp = level#
-                   :trace (.trace logger# msg# e#)
-                   :debug (.debug logger# msg# e#)
-                   :info  (.info  logger# msg# e#)
-                   :warn  (.warn  logger# msg# e#)
-                   :error (.error logger# msg# e#)
-                   :fatal (.error logger# msg# e#)
-                   (throw (IllegalArgumentException. (str level#))))
-                 (condp = level#
-                   :trace (.trace logger# msg#)
-                   :debug (.debug logger# msg#)
-                   :info  (.info  logger# msg#)
-                   :warn  (.warn  logger# msg#)
-                   :error (.error logger# msg#)
-                   :fatal (.error logger# msg#)
-                   (throw (IllegalArgumentException. (str level#)))))))})
-        (reify LoggerFactory
-          (name [_#]
-            "org.slf4j")
-          (get-logger [_# logger-ns#]
-            (org.slf4j.LoggerFactory/getLogger ^String (str logger-ns#))))))
-    (catch Exception e nil)))
+  (compile-if
+   (Class/forName "org.slf4j.Logger")
+   (do
+     (extend org.slf4j.Logger
+       Logger
+       {:enabled?
+        (fn [^org.slf4j.Logger logger level]
+          (condp = level
+            :trace (.isTraceEnabled logger)
+            :debug (.isDebugEnabled logger)
+            :info  (.isInfoEnabled  logger)
+            :warn  (.isWarnEnabled  logger)
+            :error (.isErrorEnabled logger)
+            :fatal (.isErrorEnabled logger)
+            (throw (IllegalArgumentException. (str level)))))
+        :write!
+        (fn [^org.slf4j.Logger logger level ^Throwable e msg]
+          (let [^String msg (str msg)]
+            (if e
+              (condp = level
+                :trace (.trace logger msg e)
+                :debug (.debug logger msg e)
+                :info  (.info  logger msg e)
+                :warn  (.warn  logger msg e)
+                :error (.error logger msg e)
+                :fatal (.error logger msg e)
+                (throw (IllegalArgumentException. (str level))))
+              (condp = level
+                :trace (.trace logger msg)
+                :debug (.debug logger msg)
+                :info  (.info  logger msg)
+                :warn  (.warn  logger msg)
+                :error (.error logger msg)
+                :fatal (.error logger msg)
+                (throw (IllegalArgumentException. (str level)))))))})
+     (reify LoggerFactory
+       (name [_]
+         "org.slf4j")
+       (get-logger [_ logger-ns]
+         (org.slf4j.LoggerFactory/getLogger ^String (str logger-ns)))))
+   nil))
 
 (defn cl-factory
   "Returns a Commons Logging-based implementation of the LoggerFactory protocol, or
   nil if not available."
   []
-  (try
-    (Class/forName "org.apache.commons.logging.Log")
-    (eval
-      `(do
-         (extend org.apache.commons.logging.Log
-           Logger
-           {:enabled?
-            (fn [^org.apache.commons.logging.Log logger# level#]
-              (condp = level#
-                :trace (.isTraceEnabled logger#)
-                :debug (.isDebugEnabled logger#)
-                :info  (.isInfoEnabled  logger#)
-                :warn  (.isWarnEnabled  logger#)
-                :error (.isErrorEnabled logger#)
-                :fatal (.isFatalEnabled logger#)
-                (throw (IllegalArgumentException. (str level#)))))
-            :write!
-            (fn [^org.apache.commons.logging.Log logger# level# e# msg#]
-              (if e#
-                (condp = level#
-                  :trace (.trace logger# msg# e#)
-                  :debug (.debug logger# msg# e#)
-                  :info  (.info  logger# msg# e#)
-                  :warn  (.warn  logger# msg# e#)
-                  :error (.error logger# msg# e#)
-                  :fatal (.fatal logger# msg# e#)
-                  (throw (IllegalArgumentException. (str level#))))
-                (condp = level#
-                  :trace (.trace logger# msg#)
-                  :debug (.debug logger# msg#)
-                  :info  (.info  logger# msg#)
-                  :warn  (.warn  logger# msg#)
-                  :error (.error logger# msg#)
-                  :fatal (.fatal logger# msg#)
-                  (throw (IllegalArgumentException. (str level#))))))})
-         (reify LoggerFactory
-           (name [_#]
-             "org.apache.commons.logging")
-           (get-logger [_# logger-ns#]
-             (org.apache.commons.logging.LogFactory/getLog (str logger-ns#))))))
-    (catch Exception e nil)))
+  (compile-if
+   (Class/forName "org.apache.commons.logging.Log")
+   (do
+     (extend org.apache.commons.logging.Log
+       Logger
+       {:enabled?
+        (fn [^org.apache.commons.logging.Log logger level]
+          (condp = level
+            :trace (.isTraceEnabled logger)
+            :debug (.isDebugEnabled logger)
+            :info  (.isInfoEnabled  logger)
+            :warn  (.isWarnEnabled  logger)
+            :error (.isErrorEnabled logger)
+            :fatal (.isFatalEnabled logger)
+            (throw (IllegalArgumentException. (str level)))))
+        :write!
+        (fn [^org.apache.commons.logging.Log logger level e msg]
+          (if e
+            (condp = level
+              :trace (.trace logger msg e)
+              :debug (.debug logger msg e)
+              :info  (.info  logger msg e)
+              :warn  (.warn  logger msg e)
+              :error (.error logger msg e)
+              :fatal (.fatal logger msg e)
+              (throw (IllegalArgumentException. (str level))))
+            (condp = level
+              :trace (.trace logger msg)
+              :debug (.debug logger msg)
+              :info  (.info  logger msg)
+              :warn  (.warn  logger msg)
+              :error (.error logger msg)
+              :fatal (.fatal logger msg)
+              (throw (IllegalArgumentException. (str level))))))})
+     (reify LoggerFactory
+       (name [_]
+         "org.apache.commons.logging")
+       (get-logger [_ logger-ns]
+         (org.apache.commons.logging.LogFactory/getLog (str logger-ns)))))
+   nil))
 
 (defn log4j-factory
   "Returns a Log4j-based implementation of the LoggerFactory protocol, or nil if
   not available."
   []
-  (try
-    (Class/forName "org.apache.log4j.Logger")
-    (eval
-      `(let [levels# {:trace org.apache.log4j.Level/TRACE
-                      :debug org.apache.log4j.Level/DEBUG
-                      :info  org.apache.log4j.Level/INFO
-                      :warn  org.apache.log4j.Level/WARN
-                      :error org.apache.log4j.Level/ERROR
-                      :fatal org.apache.log4j.Level/FATAL}]
-         (extend org.apache.log4j.Logger
-           Logger
-           {:enabled?
-            (fn [^org.apache.log4j.Logger logger# level#]
-              (.isEnabledFor logger#
-                 (or
-                   (levels# level#)
-                   (throw (IllegalArgumentException. (str level#))))))
-            :write!
-            (fn [^org.apache.log4j.Logger logger# level# e# msg#]
-              (let [level# (or
-                             (levels# level#)
-                             (throw (IllegalArgumentException. (str level#))))]
-                (if e#
-                  (.log logger# level# msg# e#)
-                  (.log logger# level# msg#))))})
-         (reify LoggerFactory
-           (name [_#]
-             "org.apache.log4j")
-           (get-logger [_# logger-ns#]
-             (org.apache.log4j.Logger/getLogger ^String (str logger-ns#))))))
-    (catch Exception e nil)))
+  (compile-if
+   (Class/forName "org.apache.log4j.Logger")
+   (let [levels {:trace org.apache.log4j.Level/TRACE
+                 :debug org.apache.log4j.Level/DEBUG
+                 :info  org.apache.log4j.Level/INFO
+                 :warn  org.apache.log4j.Level/WARN
+                 :error org.apache.log4j.Level/ERROR
+                 :fatal org.apache.log4j.Level/FATAL}]
+     (extend org.apache.log4j.Logger
+       Logger
+       {:enabled?
+        (fn [^org.apache.log4j.Logger logger level]
+          (.isEnabledFor logger
+                         (or
+                          (levels level)
+                          (throw (IllegalArgumentException. (str level))))))
+        :write!
+        (fn [^org.apache.log4j.Logger logger level e msg]
+          (let [level (or
+                       (levels level)
+                       (throw (IllegalArgumentException. (str level))))]
+            (if e
+              (.log logger level msg e)
+              (.log logger level msg))))})
+     (reify LoggerFactory
+       (name [_]
+         "org.apache.log4j")
+       (get-logger [_ logger-ns]
+         (org.apache.log4j.Logger/getLogger ^String (str logger-ns)))))
+   nil))
 
 (defn jul-factory
   "Returns a java.util.logging-based implementation of the LoggerFactory protocol,
   or nil if not available."
   []
-  (try
-    (Class/forName "java.util.logging.Logger")
-    (eval
-      `(let [levels# {:trace java.util.logging.Level/FINEST
-                      :debug java.util.logging.Level/FINE
-                      :info  java.util.logging.Level/INFO
-                      :warn  java.util.logging.Level/WARNING
-                      :error java.util.logging.Level/SEVERE
-                      :fatal java.util.logging.Level/SEVERE}]
-         (extend java.util.logging.Logger
-           Logger
-           {:enabled?
-            (fn [^java.util.logging.Logger logger# level#]
-              (.isLoggable logger#
+  (compile-if
+   (Class/forName "java.util.logging.Logger")
+   (let [levels {:trace java.util.logging.Level/FINEST
+                 :debug java.util.logging.Level/FINE
+                 :info  java.util.logging.Level/INFO
+                 :warn  java.util.logging.Level/WARNING
+                 :error java.util.logging.Level/SEVERE
+                 :fatal java.util.logging.Level/SEVERE}]
+     (extend java.util.logging.Logger
+       Logger
+       {:enabled?
+        (fn [^java.util.logging.Logger logger level]
+          (.isLoggable logger
+                       (or
+                        (levels level)
+                        (throw (IllegalArgumentException. (str level))))))
+        :write!
+        (fn [^java.util.logging.Logger logger level ^Throwable e msg]
+          (let [^java.util.logging.Level level
                 (or
-                  (levels# level#)
-                  (throw (IllegalArgumentException. (str level#))))))
-            :write!
-            (fn [^java.util.logging.Logger logger# level# ^Throwable e# msg#]
-              (let [^java.util.logging.Level level#
-                    (or
-                      (levels# level#)
-                      (throw (IllegalArgumentException. (str level#))))
-                    ^String msg# (str msg#)]
-                (if e#
-                  (.log logger# level# msg# e#)
-                  (.log logger# level# msg#))))})
-         (reify LoggerFactory
-           (name [_#]
-             "java.util.logging")
-           (get-logger [_# logger-ns#]
-             (java.util.logging.Logger/getLogger (str logger-ns#))))))
-    (catch Exception e nil)))
+                 (levels level)
+                 (throw (IllegalArgumentException. (str level))))
+                ^String msg (str msg)]
+            (if e
+              (.log logger level msg e)
+              (.log logger level msg))))})
+     (reify LoggerFactory
+       (name [_]
+         "java.util.logging")
+       (get-logger [_ logger-ns]
+         (java.util.logging.Logger/getLogger (str logger-ns)))))
+   nil))
 
 (defn find-factory
   "Returns the first non-nil value from slf4j-factory, cl-factory,
