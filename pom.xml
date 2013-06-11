@@ -14,12 +14,15 @@
     <developer>
       <name>Alex Taggart</name>
     </developer>
+    <developer>
+      <name>Trevor Bernard</name>
+    </developer>
   </developers>
 
   <scm>
-    <connection>scm:git:git@github.com:clojure/tools.logging.git</connection>
-    <developerConnection>scm:git:git@github.com:clojure/tools.logging.git</developerConnection>
-    <url>git@github.com:clojure/tools.logging.git</url>
+    <connection>scm:git:git@github.com:trevorbernard/tools.logging.git</connection>
+    <developerConnection>scm:git:git@github.com:trevorbernard/tools.logging.git</developerConnection>
+    <url>git@github.com:trevorbernard/tools.logging.git</url>
   </scm>
 
   <dependencies>
@@ -48,4 +51,16 @@
       <scope>test</scope>
     </dependency>
   </dependencies>
+  <distributionManagement>
+    <repository>
+      <id>releases</id>
+      <name>Internal Releases</name>
+      <url>https://repo.userevents.com/content/repositories/releases</url>
+    </repository>
+    <snapshotRepository>
+      <id>snapshots</id>
+      <name>Internal Snapshots</name>
+      <url>https://repo.userevents.com/content/repositories/snapshots</url>
+    </snapshotRepository>
+  </distributionManagement>
 </project>
