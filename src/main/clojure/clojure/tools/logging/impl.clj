@@ -41,7 +41,7 @@
     (fall-back-to-executor-services))"
   [exp then else]
   (if (try (eval exp)
-           (catch Throwable _ false))
+           (catch Throwable e# false))
     `(do ~then)
     `(do ~else)))
 
